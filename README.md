@@ -1,13 +1,22 @@
-# React + Vite
+# 🎨 Ink & Think  
+A real-time **multiplayer drawing & guessing game** (similar to Skribbl.io) where players create or join rooms, take turns drawing, and guess words based on sketches. Built with **React, Node.js, and Socket.IO** for seamless live interaction.  
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+---
 
-Currently, two official plugins are available:
+## ✨ Features  
+- 🏠 **Multiplayer Rooms**: Create or join game rooms with unique IDs.  
+- ✏️ **Interactive Drawing Board**: Real-time canvas synced across all players.  
+- 🎮 **Turn-Based Gameplay**: One player draws while others guess.  
+- ⏱️ **Timers & Scoring**: Automatic scoring with countdowns for each round.  
+- 💬 **Live Chat**: Built-in chat for guessing and interaction.  
+- 🔄 **Reconnection Support**: Smooth rejoin in case of network drop.  
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## Expanding the ESLint configuration
+## 🛠️ Tech Stack  
+- **Frontend:** React.js, Tailwind CSS, Socket.IO Client  
+- **Backend:** Node.js, Express.js, Socket.IO  
+- **Other:** WebSockets, Canvas API  
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-# Ink-think-frontend
+## Backend
+- You can check backend logic on request Here-> https://github.com/CodeXJainTech/ink-think-backend
