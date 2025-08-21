@@ -9,7 +9,6 @@ A real-time **multiplayer drawing & guessing game** (similar to Skribbl.io) wher
 - 🎮 **Turn-Based Gameplay**: One player draws while others guess.  
 - ⏱️ **Timers & Scoring**: Automatic scoring with countdowns for each round.  
 - 💬 **Live Chat**: Built-in chat for guessing and interaction.  
-- 🔄 **Reconnection Support**: Smooth rejoin in case of network drop.  
 
 ---
 
