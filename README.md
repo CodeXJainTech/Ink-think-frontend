@@ -18,4 +18,4 @@ A real-time **multiplayer drawing & guessing game** (similar to Skribbl.io) wher
 - **Other:** WebSockets, Canvas API  
 
 ## Backend
-- You can check backend logic on request Here-> https://github.com/CodeXJainTech/ink-think-backend
+- You can check backend logic on request Here-> https://github.com/CodeXJainTech/Ink-think-backend
