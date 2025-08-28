@@ -13,8 +13,8 @@ const Room = () => {
   const didJoin = useRef();
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isStarted, setIsStarted] = useState(false);
   const [myName, setMyName] = useState(() => {
-    // priority: state -> localStorage -> null (force autojoin)
     return (
       location.state?.nickname ||
       localStorage.getItem(`room:${roomId}:nickname`) ||
@@ -59,13 +59,12 @@ const Room = () => {
     ensureJoined().then(() => {
       if (!socket.connected) socket.connect();
 
-      // join socket room
       socket.emit("joinRoom", { roomId, nickname: myName });
 
-      // Listen for updates
       socket.on("userJoined", (player) => {
         setRoom((prev) => {
-          if (prev.players.some(p => p.nickname === player.nickname)) {
+          if (!prev) return prev;
+          if (prev.players.some((p) => p.nickname === player.nickname)) {
             return prev; // don't add duplicates
           }
           return {
@@ -75,7 +74,6 @@ const Room = () => {
         });
       });
 
-
       socket.on("userLeft", (nickname) => {
         setRoom((prev) => ({
           ...prev,
@@ -83,29 +81,36 @@ const Room = () => {
         }));
       });
 
-      socket.on("roomUpdated", (updatedRoom) => {
-        setRoom(updatedRoom);
+      socket.on("gameStarted", ({ roomId }) => {
+        setIsStarted(true);
       });
+
     });
 
     return () => {
       socket.emit("leaveRoom", { roomId, nickname: myName });
       socket.off("userJoined");
       socket.off("userLeft");
-      socket.off("roomUpdated");
-      socket.disconnect();
+      socket.off("gamestarted");
+      // ⚠️ don’t disconnect unless you want socket dead for whole app
     };
   }, [roomId, myName, navigate]);
+
+  useEffect(() => {
+    if (isStarted) {
+      navigate(`/game/${roomId}`);
+    }
+  }, [isStarted, navigate, roomId]);
 
   const handleStart = async () => {
     try {
       await axios.post(`/room/${roomId}/start`, { nickname: myName });
-      socket.emit("roomUpdated", { roomId }); // tell others game started
-      navigate(`/game/${roomId}`);
+      socket.emit("startGame", { roomId });
     } catch (err) {
       alert(err?.response?.data?.message || "Could not start the game.");
     }
   };
+
 
   const handleEdit = () => {
     navigate("/setup", { state: { room: { ...room, roomId } } });
@@ -136,7 +141,6 @@ const Room = () => {
   return (
     <div className="flex justify-center items-center min-h-screen bg-[#111827] text-white">
       <div className="bg-[#1f2937] p-6 rounded-2xl shadow-xl w-[520px] border-4 border-dashed border-[#06b6d4]">
-        {/* Room Info */}
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-[#f97316] drop-shadow">
             🎉 {room.owner}'s Room
@@ -147,7 +151,6 @@ const Room = () => {
         </div>
         <p className="text-[#38bdf8] mb-4">Room ID: {roomId}</p>
 
-        {/* Settings */}
         <div className="bg-[#0f172a] p-3 rounded-lg text-sm mb-4">
           <p>⏱ Time: {room.time}s</p>
           <p>👥 Max Players: {room.maxPlayers}</p>
@@ -155,7 +158,6 @@ const Room = () => {
           <p>🧩 Word Type: {room.wordType}</p>
         </div>
 
-        {/* Players List */}
         <h2 className="text-lg font-semibold mb-2">Players</h2>
         <ul className="bg-[#0f172a] p-3 rounded-lg mb-4 max-h-48 overflow-y-auto">
           {room.players.map((p, idx) => (
@@ -164,7 +166,7 @@ const Room = () => {
               className={`mb-2 p-2 rounded ${
                 p.nickname === room.owner
                   ? "bg-[#f97316] text-black font-bold"
-                  : "bg-[#374151]"
+                  : "bg-[#374151] text-white"
               }`}
             >
               {p.nickname} {p.nickname === room.owner && "(Owner)"}
@@ -172,7 +174,6 @@ const Room = () => {
           ))}
         </ul>
 
-        {/* Buttons */}
         <div className="flex gap-3 justify-center">
           {iAmOwner && (
             <>

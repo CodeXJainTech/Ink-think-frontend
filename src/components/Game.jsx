@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import DrawingBoard from "./DrawingBoard";
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:3000"); // ✅ replace with your backend URL
 
 const Game = () => {
   const { roomId } = useParams();
@@ -15,6 +18,17 @@ const Game = () => {
   const [drawerName] = useState("Player1");
 
   const chatRef = useRef(null);
+
+  // ---------------------------
+  // 🔥 New: Join Room on Mount
+  // ---------------------------
+  useEffect(() => {
+    socket.emit("joinroom", roomId);
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [roomId]);
 
   // Add guess handler (memoized to avoid re-creation each render)
   const handleGuess = useCallback(
@@ -92,7 +106,8 @@ const Game = () => {
           </div>
 
           <div className="flex-1 flex justify-center items-center p-1 h-auto">
-            <DrawingBoard director={true} />
+            {/* ✅ Pass socket & roomId so all players sync */}
+            <DrawingBoard director={isDrawer} socket={socket} roomId={roomId} />
           </div>
         </div>
 

@@ -1,18 +1,18 @@
 import { useRef, useState, useEffect } from "react";
 import React from "react";
+import socket from "../socket";
 
-const DrawingBoard = ({ director }) => {
+const DrawingBoard = ({ director, roomId }) => {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
-  const isDrawing = useRef(false); // ✅ no re-renders on draw state
-  console.log("dashborad se");
+  const isDrawing = useRef(false); 
   const [color, setColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(4);
   const [isEraser, setIsEraser] = useState(false);
 
-  // canDraw depends on director prop
   const canDraw = director;
 
+  // Setup canvas once
   useEffect(() => {
     const canvas = canvasRef.current;
     canvas.width = canvas.clientWidth;
@@ -24,6 +24,41 @@ const DrawingBoard = ({ director }) => {
     ctx.lineWidth = brushSize;
     ctxRef.current = ctx;
   }, []);
+
+  // Listen for socket drawing events
+  useEffect(() => {
+    if (!roomId) return;
+
+    socket.on("beginPath", ({ x, y, color, brushSize }) => {
+      ctxRef.current.strokeStyle = color;
+      ctxRef.current.lineWidth = brushSize;
+      ctxRef.current.beginPath();
+      ctxRef.current.moveTo(x, y);
+    });
+
+    socket.on("draw", ({ x, y }) => {
+      ctxRef.current.lineTo(x, y);
+      ctxRef.current.stroke();
+    });
+
+    socket.on("stopDrawing", () => {
+      ctxRef.current.closePath();
+    });
+
+    socket.on("clearCanvas", () => {
+      const canvas = canvasRef.current;
+      ctxRef.current.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+    return () => {
+      socket.off("beginPath");
+      socket.off("draw");
+      socket.off("stopDrawing");
+      socket.off("clearCanvas");
+    };
+  }, [roomId]);
+
+  // Update brush settings when state changes
   useEffect(() => {
     if (ctxRef.current) {
       ctxRef.current.strokeStyle = isEraser ? "#FFFFFF" : color;
@@ -43,30 +78,38 @@ const DrawingBoard = ({ director }) => {
   };
 
   const startDrawing = (e) => {
-    if (!canDraw) return;
+    if (!canDraw || !roomId) return;
     const { x, y } = getMousePos(e);
     ctxRef.current.beginPath();
     ctxRef.current.moveTo(x, y);
-    isDrawing.current = true; // ✅ ref, not state
+    isDrawing.current = true;
+
+    socket.emit("beginPath", { roomId, x, y, color, brushSize });
   };
 
   const draw = (e) => {
-    if (!isDrawing.current || !canDraw) return;
+    if (!isDrawing.current || !canDraw || !roomId) return;
     const { x, y } = getMousePos(e);
     ctxRef.current.lineTo(x, y);
     ctxRef.current.stroke();
+
+    socket.emit("draw", { roomId, x, y });
   };
 
   const stopDrawing = () => {
-    if (!canDraw) return;
+    if (!canDraw || !roomId) return;
     ctxRef.current.closePath();
-    isDrawing.current = false; // ✅ ref, not state
+    isDrawing.current = false;
+
+    socket.emit("stopDrawing", { roomId });
   };
 
   const clearCanvas = () => {
-    if (!canDraw) return;
+    if (!canDraw || !roomId) return;
     const canvas = canvasRef.current;
     ctxRef.current.clearRect(0, 0, canvas.width, canvas.height);
+
+    socket.emit("clearCanvas", { roomId });
   };
 
   return (
@@ -124,5 +167,4 @@ const DrawingBoard = ({ director }) => {
   );
 };
 
-// ✅ Prevent re-render unless props change
 export default React.memo(DrawingBoard);
