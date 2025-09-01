@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-// Optional: set once in your app bootstrap instead
 axios.defaults.baseURL = "http://localhost:3000";
 
 const Home = () => {

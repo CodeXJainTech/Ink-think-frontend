@@ -8,7 +8,7 @@ const WORD_TYPES = ["Animals", "Places", "Buildings", "Food", "Random"];
 const Setup = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const editRoom = location.state?.room || null; // when editing
+  const editRoom = location.state?.room || null;
   const presetNickname = location.state?.nickname || editRoom?.owner || "";
 
   const [form, setForm] = useState({

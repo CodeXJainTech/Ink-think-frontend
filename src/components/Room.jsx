@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
-import socket from "../socket"; // 👈 shared socket instance
+import socket from "../socket";
 
 axios.defaults.baseURL = "http://localhost:3000";
 
@@ -29,6 +29,7 @@ const Room = () => {
 
   const fetchRoom = async () => {
     const { data } = await axios.get(`/room/${roomId}`);
+    console.log(data);
     return data.room;
   };
 
@@ -92,7 +93,7 @@ const Room = () => {
       socket.off("userJoined");
       socket.off("userLeft");
       socket.off("gamestarted");
-      // ⚠️ don’t disconnect unless you want socket dead for whole app
+      //don’t disconnect unless i want socket dead for whole app
     };
   }, [roomId, myName, navigate]);
 

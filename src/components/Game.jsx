@@ -1,67 +1,137 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import DrawingBoard from "./DrawingBoard";
+import ViewBoard from "./ViewBoard";
 import { io } from "socket.io-client";
+import axios from "axios";
 
-const socket = io("http://localhost:3000"); // ✅ replace with your backend URL
+axios.defaults.baseURL = "http://localhost:3000"; // backend REST base
 
 const Game = () => {
   const { roomId } = useParams();
-  console.log("Game component mounted");
+  const nickname = localStorage.getItem(`room:${roomId}:nickname`);
+  const [socket, setSocket] = useState(null);
 
-  // States
+  // Chat / gameplay states
   const [guesses, setGuesses] = useState([]);
   const [message, setMessage] = useState("");
-  const [word] = useState("Sunflower");
-  const [isDrawer] = useState(true);
+
+  // Role + word + timer
+  const [word, setWord] = useState(""); // from server
+  const [isDrawer, setIsDrawer] = useState(false);
   const [timeLeft, setTimeLeft] = useState(60);
-  const [drawerName] = useState("Player1");
+  const timerRef = useRef(null);
+
+  // Room UI data
+  const [round, setRound] = useState(1);
+  const [totalRounds, setTotalRounds] = useState(5);
+  const [players, setPlayers] = useState([]);
+  const [maxPlayers, setMaxPlayers] = useState(8);
+  const [drawerName, setDrawerName] = useState("Unknown");
 
   const chatRef = useRef(null);
 
   // ---------------------------
-  // 🔥 New: Join Room on Mount
+  // Fetch room data for UI (REST)
   // ---------------------------
   useEffect(() => {
-    socket.emit("joinroom", roomId);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { data } = await axios.get(`/room/${roomId}`);
+        if (cancelled) return;
+        const r = data?.room || {};
+
+        setRound(r.currentRound ?? 1);
+        setTotalRounds(r.totalRounds ?? 5);
+        setPlayers((r.players ?? []).map(p => ({ ...p, points: p.points ?? 0 })));
+        setMaxPlayers(r.maxPlayers ?? 8);
+
+        // initialize local timer from room config
+        setTimeLeft(r.time ?? 60);
+      } catch (e) {
+        console.error("Failed to load room data:", e?.response?.data || e.message);
+      }
+    })();
 
     return () => {
-      socket.disconnect();
+      cancelled = true;
     };
   }, [roomId]);
 
-  // Add guess handler (memoized to avoid re-creation each render)
+  // ---------------------------
+  // Local countdown timer: start immediately
+  // (Server 'timer' events will still override/sync when received)
+  // // ---------------------------
+  // useEffect(() => {
+  //   if (timerRef.current) clearInterval(timerRef.current);
+  //   timerRef.current = setInterval(() => {
+  //     setTimeLeft((t) => (t > 0 ? t - 1 : 0));
+  //   }, 1000);
+  //   return () => clearInterval(timerRef.current);
+  // }, [roomId]); // restart when entering this game/room
+
+  // ---------------------------
+  // Setup socket + join room (keep your events)
+  // ---------------------------
+  useEffect(() => {
+    const newSocket = io("http://localhost:3000"); // your backend URL
+    setSocket(newSocket);
+
+    newSocket.emit("joinRoom", { roomId, nickname });
+
+    // role assignment
+    newSocket.on("roundStart", ({ round, drawer, word }) => {
+      setRound(round);
+      setDrawerName(drawer);
+      setIsDrawer(drawer === nickname);
+      if (drawer === nickname) {
+        setWord(word);   // only drawer sees the word
+      } else {
+        setWord("");     // guessers don’t
+      }
+    });
+
+    console.log("432dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd4");
+    // optional: server timer sync (if backend emits it)
+    newSocket.on("timerUpdate", (payload) => {
+      console.log("client received timerUpdate:", payload);
+      setTimeLeft(payload.timeLeft);
+    });
+
+
+    // guesses
+    newSocket.on("newGuess", (guess) => {
+      setGuesses((prev) => [...prev, guess]);
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [roomId]);
+
+  // ---------------------------
+  // Guess handler
+  // ---------------------------
   const handleGuess = useCallback(
     (e) => {
       e.preventDefault();
-      if (!message.trim()) return;
-      setGuesses((prev) => [...prev, { user: "You", text: message }]);
+      if (!message.trim() || !socket) return;
+      const guess = { user: "You", text: message };
+      setGuesses((prev) => [...prev, guess]);
+      socket.emit("sendGuess", { roomId, guess });
       setMessage("");
     },
-    [message]
+    [message, socket, roomId]
   );
 
-  // Scroll chat to bottom only when new guess is added
+  // Auto-scroll chat
   useEffect(() => {
     if (chatRef.current) {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }
   }, [guesses.length]);
-
-  // Timer effect (runs only once, not on every tick)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <div className="min-h-screen bg-[#1E1E2F] text-white flex flex-col p-2">
@@ -70,8 +140,8 @@ const Game = () => {
         <h2 className="text-lg font-bold text-[#FF6F61]">🎮 Ink & Think</h2>
         <div className="hidden sm:flex gap-3 text-xs sm:text-sm text-gray-200">
           <span>Room: {roomId}</span>
-          <span>Round: 1 / 5</span>
-          <span>Players: 1 / 8</span>
+          <span>Round: {round} / {totalRounds}</span>
+          <span>Players: {players.length} / {maxPlayers}</span>
         </div>
         <button
           className="sm:hidden px-2 py-1 bg-[#4ECDC4] rounded text-xs text-white"
@@ -87,13 +157,24 @@ const Game = () => {
         <div className="sm:flex-[3] flex flex-col bg-[#2B2B40] rounded-md border border-[#FFD93D]/30 shadow-sm p-2">
           <h3 className="text-sm font-semibold text-[#FFD93D] mb-1">🏆 Ranking</h3>
           <div className="flex flex-col gap-1 text-xs sm:text-sm">
-            <span className="text-[#FF6F61] font-bold">1. Player1 (120 pts)</span>
-            <span className="text-gray-300">2. Player2 (80 pts)</span>
-            <span className="text-gray-300">3. Player3 (50 pts)</span>
+            {players.length === 0 ? (
+              <>
+                <span className="text-gray-300">No players yet</span>
+              </>
+            ) : (
+              players.map((p, i) => (
+                <span
+                  key={`${p.nickname}-${i}`}
+                  className={`${i === 0 ? "text-[#FF6F61] font-bold" : "text-gray-300"}`}
+                >
+                  {i + 1}. {p.nickname} ({p.points ?? 0} pts)
+                </span>
+              ))
+            )}
           </div>
         </div>
 
-        {/* Drawing board */}
+        {/* Drawing board area */}
         <div className="sm:flex-[17] flex flex-col bg-[#2B2B40] rounded-md border border-[#FFD93D]/30 shadow-sm">
           <div className="flex justify-between items-center px-2 py-1 border-b border-[#4D96FF]/30 text-xs sm:text-sm">
             <span className="text-[#FF6F61] font-semibold">✏️ Drawer: {drawerName}</span>
@@ -106,8 +187,12 @@ const Game = () => {
           </div>
 
           <div className="flex-1 flex justify-center items-center p-1 h-auto">
-            {/* ✅ Pass socket & roomId so all players sync */}
-            <DrawingBoard director={isDrawer} socket={socket} roomId={roomId} />
+            {/* Keep your existing logic */}
+            {isDrawer ? (
+              <DrawingBoard socket={socket} roomId={roomId} />
+            ) : (
+              <ViewBoard roomId={roomId} socket={socket} />
+            )}
           </div>
         </div>
 

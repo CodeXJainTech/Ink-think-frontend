@@ -1,8 +1,8 @@
 import { useRef, useState, useEffect } from "react";
 import React from "react";
-import socket from "../socket";
+// import socket from "../socket";
 
-const DrawingBoard = ({ director, roomId }) => {
+const DrawingBoard = ({ socket, roomId }) => {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
   const isDrawing = useRef(false); 
@@ -10,7 +10,7 @@ const DrawingBoard = ({ director, roomId }) => {
   const [brushSize, setBrushSize] = useState(4);
   const [isEraser, setIsEraser] = useState(false);
 
-  const canDraw = director;
+  const canDraw = true;
 
   // Setup canvas once
   useEffect(() => {
@@ -78,13 +78,14 @@ const DrawingBoard = ({ director, roomId }) => {
   };
 
   const startDrawing = (e) => {
+    e.preventDefault();
     if (!canDraw || !roomId) return;
     const { x, y } = getMousePos(e);
     ctxRef.current.beginPath();
     ctxRef.current.moveTo(x, y);
     isDrawing.current = true;
 
-    socket.emit("beginPath", { roomId, x, y, color, brushSize });
+    socket.emit("beginPath", { roomId, x, y, color: isEraser ? "#FFFFFF" : color, brushSize });
   };
 
   const draw = (e) => {
