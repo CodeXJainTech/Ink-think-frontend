@@ -6,7 +6,7 @@ import socket from "../socket";
 import DrawingBoard from "./DrawingBoard";
 import ViewBoard from "./ViewBoard";
 
-axios.defaults.baseURL = "http://localhost:3000";
+axios.defaults.baseURL = "https://ink-think.onrender.com";
 
 const Game = () => {
   const { roomId } = useParams();

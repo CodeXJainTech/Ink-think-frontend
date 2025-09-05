@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import socket from "../socket";
 
-axios.defaults.baseURL = "http://localhost:3000";
+axios.defaults.baseURL = "https://ink-think.onrender.com";
 
 const Room = () => {
   const { roomId } = useParams();

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 
-axios.defaults.baseURL = "http://localhost:3000";
+axios.defaults.baseURL = "https://ink-think.onrender.com";
 const WORD_TYPES = ["Animals", "Places", "Buildings", "Food", "Random"];
 
 const Setup = () => {
