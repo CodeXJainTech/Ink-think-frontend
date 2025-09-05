@@ -10,7 +10,8 @@ const Room = () => {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const didJoin = useRef();
+  const didJoin = useRef(false);
+
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isStarted, setIsStarted] = useState(false);
@@ -27,12 +28,13 @@ const Room = () => {
     [room, myName]
   );
 
+  // fetch room data
   const fetchRoom = async () => {
     const { data } = await axios.get(`/room/${roomId}`);
-    console.log(data);
     return data.room;
   };
 
+  // join logic
   const ensureJoined = async () => {
     try {
       const r = await fetchRoom();
@@ -53,65 +55,59 @@ const Room = () => {
     }
   };
 
+  // initial fetch once
   useEffect(() => {
     if (didJoin.current) return;
     didJoin.current = true;
+    ensureJoined();
+  }, [roomId]);
 
-    ensureJoined().then(() => {
-      if (!socket.connected) socket.connect();
+  // socket setup (runs when myName is ready)
+  useEffect(() => {
+    if (!myName) return; // wait until nickname is ready
 
-      socket.emit("joinRoom", { roomId, nickname: myName });
+    if (!socket.connected) socket.connect();
+    socket.emit("joinRoom", { roomId, nickname: myName });
 
-      socket.on("userJoined", (player) => {
-        setRoom((prev) => {
-          if (!prev) return prev;
-          if (prev.players.some((p) => p.nickname === player.nickname)) {
-            return prev; // don't add duplicates
-          }
-          return {
-            ...prev,
-            players: [...prev.players, player],
-          };
-        });
+    socket.on("userJoined", (player) => {
+      setRoom((prev) => {
+        if (!prev) return prev;
+        if (prev.players.some((p) => p.nickname === player.nickname)) return prev;
+        return { ...prev, players: [...prev.players, player] };
       });
+    });
 
-      socket.on("userLeft", (nickname) => {
-        setRoom((prev) => ({
-          ...prev,
-          players: prev.players.filter((p) => p.nickname !== nickname),
-        }));
-      });
+    socket.on("userLeft", (nickname) => {
+      setRoom((prev) => ({
+        ...prev,
+        players: prev.players.filter((p) => p.nickname !== nickname),
+      }));
+    });
 
-      socket.on("gameStarted", ({ roomId }) => {
-        setIsStarted(true);
-      });
-
+    socket.on("gameStarted", ({ roomId }) => {
+      console.log("📢 gameStarted received, navigating...");
+      setIsStarted(true);
     });
 
     return () => {
       socket.emit("leaveRoom", { roomId, nickname: myName });
       socket.off("userJoined");
       socket.off("userLeft");
-      socket.off("gamestarted");
-      //don’t disconnect unless i want socket dead for whole app
+      socket.off("gameStarted");
     };
-  }, [roomId, myName, navigate]);
+  }, [roomId, myName]);
 
+  // navigate when game starts
   useEffect(() => {
     if (isStarted) {
       navigate(`/game/${roomId}`);
     }
   }, [isStarted, navigate, roomId]);
 
-  const handleStart = async () => {
-    try {
-      await axios.post(`/room/${roomId}/start`, { nickname: myName });
-      socket.emit("startGame", { roomId });
-    } catch (err) {
-      alert(err?.response?.data?.message || "Could not start the game.");
-    }
+  // owner starts the game
+  const handleStart = () => {
+    socket.emit("startGame", { roomId, nickname: myName });
   };
-
 
   const handleEdit = () => {
     navigate("/setup", { state: { room: { ...room, roomId } } });
@@ -122,7 +118,7 @@ const Room = () => {
       await axios.post(`/room/${roomId}/leave`, { nickname: myName });
       socket.emit("leaveRoom", { roomId, nickname: myName });
     } catch {
-      // ignore errors
+      // ignore
     } finally {
       localStorage.removeItem(`room:${roomId}:nickname`);
       navigate("/");

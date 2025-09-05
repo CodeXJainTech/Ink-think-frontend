@@ -1,23 +1,21 @@
+// src/components/DrawingBoard.jsx
 import { useRef, useState, useEffect } from "react";
 import React from "react";
-// import socket from "../socket";
 
 const DrawingBoard = ({ socket, roomId }) => {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
-  const isDrawing = useRef(false); 
+  const isDrawing = useRef(false);
   const [color, setColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(4);
   const [isEraser, setIsEraser] = useState(false);
 
-  const canDraw = true;
+  const canDraw = true; // set externally if needed
 
-  // Setup canvas once
   useEffect(() => {
     const canvas = canvasRef.current;
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
-
     const ctx = canvas.getContext("2d");
     ctx.lineCap = "round";
     ctx.strokeStyle = color;
@@ -25,40 +23,6 @@ const DrawingBoard = ({ socket, roomId }) => {
     ctxRef.current = ctx;
   }, []);
 
-  // Listen for socket drawing events
-  useEffect(() => {
-    if (!roomId) return;
-
-    socket.on("beginPath", ({ x, y, color, brushSize }) => {
-      ctxRef.current.strokeStyle = color;
-      ctxRef.current.lineWidth = brushSize;
-      ctxRef.current.beginPath();
-      ctxRef.current.moveTo(x, y);
-    });
-
-    socket.on("draw", ({ x, y }) => {
-      ctxRef.current.lineTo(x, y);
-      ctxRef.current.stroke();
-    });
-
-    socket.on("stopDrawing", () => {
-      ctxRef.current.closePath();
-    });
-
-    socket.on("clearCanvas", () => {
-      const canvas = canvasRef.current;
-      ctxRef.current.clearRect(0, 0, canvas.width, canvas.height);
-    });
-
-    return () => {
-      socket.off("beginPath");
-      socket.off("draw");
-      socket.off("stopDrawing");
-      socket.off("clearCanvas");
-    };
-  }, [roomId]);
-
-  // Update brush settings when state changes
   useEffect(() => {
     if (ctxRef.current) {
       ctxRef.current.strokeStyle = isEraser ? "#FFFFFF" : color;
@@ -85,7 +49,10 @@ const DrawingBoard = ({ socket, roomId }) => {
     ctxRef.current.moveTo(x, y);
     isDrawing.current = true;
 
-    socket.emit("beginPath", { roomId, x, y, color: isEraser ? "#FFFFFF" : color, brushSize });
+    socket.emit("drawOp", {
+      roomId,
+      op: { type: "begin", x, y, color: isEraser ? "#FFFFFF" : color, brushSize },
+    });
   };
 
   const draw = (e) => {
@@ -94,23 +61,21 @@ const DrawingBoard = ({ socket, roomId }) => {
     ctxRef.current.lineTo(x, y);
     ctxRef.current.stroke();
 
-    socket.emit("draw", { roomId, x, y });
+    socket.emit("drawOp", { roomId, op: { type: "line", x, y } });
   };
 
   const stopDrawing = () => {
     if (!canDraw || !roomId) return;
     ctxRef.current.closePath();
     isDrawing.current = false;
-
-    socket.emit("stopDrawing", { roomId });
+    socket.emit("drawOp", { roomId, op: { type: "stop" } });
   };
 
   const clearCanvas = () => {
     if (!canDraw || !roomId) return;
     const canvas = canvasRef.current;
     ctxRef.current.clearRect(0, 0, canvas.width, canvas.height);
-
-    socket.emit("clearCanvas", { roomId });
+    socket.emit("drawOp", { roomId, op: { type: "clear" } });
   };
 
   return (
@@ -127,16 +92,13 @@ const DrawingBoard = ({ socket, roomId }) => {
         onTouchEnd={stopDrawing}
       />
 
-      {/* Controls */}
       <div className="flex flex-wrap gap-2 items-center justify-center">
         <input
           type="color"
           value={color}
           disabled={isEraser || !canDraw}
           onChange={(e) => setColor(e.target.value)}
-          className={`w-10 h-10 cursor-pointer rounded ${
-            isEraser || !canDraw ? "opacity-50" : ""
-          }`}
+          className={`w-10 h-10 cursor-pointer rounded ${isEraser || !canDraw ? "opacity-50" : ""}`}
         />
         <input
           type="range"
@@ -147,20 +109,12 @@ const DrawingBoard = ({ socket, roomId }) => {
           disabled={!canDraw}
         />
         <span className="text-[#ADE8F4] w-24">Size: {brushSize}</span>
-        <button
-          onClick={() => setIsEraser(!isEraser)}
-          disabled={!canDraw}
-          className={`px-3 py-1 rounded ${
-            isEraser ? "bg-yellow-500" : "bg-[#0077B6]"
-          } text-white text-sm`}
-        >
+        <button onClick={() => setIsEraser(!isEraser)} disabled={!canDraw}
+          className={`px-3 py-1 rounded ${isEraser ? "bg-yellow-500" : "bg-[#0077B6]"} text-white text-sm`}>
           {isEraser ? "Eraser On" : "Eraser Off"}
         </button>
-        <button
-          onClick={clearCanvas}
-          disabled={!canDraw}
-          className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
-        >
+        <button onClick={clearCanvas} disabled={!canDraw}
+          className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
           Clear
         </button>
       </div>

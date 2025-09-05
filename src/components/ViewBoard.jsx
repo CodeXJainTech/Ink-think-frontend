@@ -1,8 +1,8 @@
+// src/components/ViewBoard.jsx
 import { useRef, useEffect } from "react";
 import React from "react";
-import socket from "../socket";
 
-const ViewBoard = ({ roomId }) => {
+const ViewBoard = ({ socket, roomId }) => {
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
 
@@ -10,45 +10,59 @@ const ViewBoard = ({ roomId }) => {
     const canvas = canvasRef.current;
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
-
     const ctx = canvas.getContext("2d");
     ctx.lineCap = "round";
     ctxRef.current = ctx;
   }, []);
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !socket) return;
 
-    socket.on("beginPath", ({ x, y, color, brushSize }) => {
-      ctxRef.current.strokeStyle = color;
-      ctxRef.current.lineWidth = brushSize;
-      ctxRef.current.beginPath();
-      ctxRef.current.moveTo(x, y);
-    });
+    const replayOp = (op) => {
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      switch (op.type) {
+        case "begin":
+          ctx.strokeStyle = op.color || "#000";
+          ctx.lineWidth = op.brushSize || 4;
+          ctx.beginPath();
+          ctx.moveTo(op.x, op.y);
+          break;
+        case "line":
+          ctx.lineTo(op.x, op.y);
+          ctx.stroke();
+          break;
+        case "stop":
+          ctx.closePath();
+          break;
+        case "clear":
+          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+          break;
+        default:
+          break;
+      }
+    };
 
-    socket.on("drawBatch", ({ points }) => {
-      points.forEach(({ x, y }) => {
-        ctxRef.current.lineTo(x, y);
-        ctxRef.current.stroke();
-      });
-    });
+    const handleInit = ({ operations }) => {
+      // replay full history
+      operations.forEach((op) => replayOp(op));
+    };
 
-    socket.on("stopDrawing", () => {
-      ctxRef.current.closePath();
-    });
+    const handleDrawOp = ({ op }) => {
+      replayOp(op);
+    };
 
-    socket.on("clearCanvas", () => {
-      const canvas = canvasRef.current;
-      ctxRef.current.clearRect(0, 0, canvas.width, canvas.height);
-    });
+    // request initial drawing operations from server
+    socket.emit("fetchDrawing", { roomId });
+
+    socket.on("initDrawing", handleInit);
+    socket.on("drawOp", handleDrawOp);
 
     return () => {
-      socket.off("beginPath");
-      socket.off("drawBatch");
-      socket.off("stopDrawing");
-      socket.off("clearCanvas");
+      socket.off("initDrawing", handleInit);
+      socket.off("drawOp", handleDrawOp);
     };
-  }, [roomId]);
+  }, [roomId, socket]);
 
   return (
     <canvas
